@@ -34,12 +34,12 @@ public class UpdateHandler : IUpdateHandler
             // UpdateType.ShippingQuery:
             // UpdateType.PreCheckoutQuery:
             // UpdateType.Poll:
-            { Message: { } message }                       => BotOnMessageReceived(message, cancellationToken),
-            { EditedMessage: { } message }                 => BotOnMessageReceived(message, cancellationToken),
-            { CallbackQuery: { } callbackQuery }           => BotOnCallbackQueryReceived(callbackQuery, cancellationToken),
-            { InlineQuery: { } inlineQuery }               => BotOnInlineQueryReceived(inlineQuery, cancellationToken),
+            { Message: { } message } => BotOnMessageReceived(message, cancellationToken),
+            { EditedMessage: { } message } => BotOnMessageReceived(message, cancellationToken),
+            { CallbackQuery: { } callbackQuery } => BotOnCallbackQueryReceived(callbackQuery, cancellationToken),
+            { InlineQuery: { } inlineQuery } => BotOnInlineQueryReceived(inlineQuery, cancellationToken),
             { ChosenInlineResult: { } chosenInlineResult } => BotOnChosenInlineResultReceived(chosenInlineResult, cancellationToken),
-            _                                              => UnknownUpdateHandlerAsync(update, cancellationToken)
+            _ => UnknownUpdateHandlerAsync(update, cancellationToken)
         };
 
         await handler;
@@ -54,13 +54,12 @@ public class UpdateHandler : IUpdateHandler
         var action = messageText.Split(' ')[0] switch
         {
             "/inline_keyboard" => SendInlineKeyboard(_botClient, message, cancellationToken),
-            "/keyboard"        => SendReplyKeyboard(_botClient, message, cancellationToken),
-            "/remove"          => RemoveKeyboard(_botClient, message, cancellationToken),
-            "/photo"           => SendFile(_botClient, message, cancellationToken),
-            "/request"         => RequestContactAndLocation(_botClient, message, cancellationToken),
-            "/inline_mode"     => StartInlineQuery(_botClient, message, cancellationToken),
-            "/throw"           => FailingHandler(_botClient, message, cancellationToken),
-            _                  => Usage(_botClient, message, cancellationToken)
+            "/keyboard" => SendReplyKeyboard(_botClient, message, cancellationToken),
+            "/remove" => RemoveKeyboard(_botClient, message, cancellationToken),
+            "/request" => RequestContactAndLocation(_botClient, message, cancellationToken),
+            "/throw" => FailingHandler(_botClient, message, cancellationToken),
+            "/start" => BotStart(_botClient, message, cancellationToken),
+            _ => Usage(_botClient, message, cancellationToken)
         };
         Message sentMessage = await action;
         _logger.LogInformation("The message was sent with id: {SentMessageId}", sentMessage.MessageId);
@@ -129,24 +128,6 @@ public class UpdateHandler : IUpdateHandler
                 cancellationToken: cancellationToken);
         }
 
-        static async Task<Message> SendFile(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
-        {
-            await botClient.SendChatActionAsync(
-                message.Chat.Id,
-                ChatAction.UploadPhoto,
-                cancellationToken: cancellationToken);
-
-            const string filePath = "Files/tux.png";
-            await using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-            var fileName = filePath.Split(Path.DirectorySeparatorChar).Last();
-
-            return await botClient.SendPhotoAsync(
-                chatId: message.Chat.Id,
-                photo: new InputFile(fileStream, fileName),
-                caption: "Nice Picture",
-                cancellationToken: cancellationToken);
-        }
-
         static async Task<Message> RequestContactAndLocation(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
         {
             ReplyKeyboardMarkup RequestReplyKeyboard = new(
@@ -163,13 +144,30 @@ public class UpdateHandler : IUpdateHandler
                 cancellationToken: cancellationToken);
         }
 
+        static async Task<Message> BotStart(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
+        {
+            ReplyKeyboardMarkup replyKeyboardMarkup = new(
+                new[]
+                {
+                        new KeyboardButton[] { "Start game" },
+                })
+            {
+                ResizeKeyboard = true
+            };
+
+            return await botClient.SendTextMessageAsync(
+                chatId: message.Chat.Id,
+                text: "Choose",
+                replyMarkup: replyKeyboardMarkup,
+                cancellationToken: cancellationToken);
+        }
+
         static async Task<Message> Usage(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
         {
             const string usage = "Usage:\n" +
                                  "/inline_keyboard - send inline keyboard\n" +
                                  "/keyboard    - send custom keyboard\n" +
                                  "/remove      - remove custom keyboard\n" +
-                                 "/photo       - send a photo\n" +
                                  "/request     - request location or contact\n" +
                                  "/inline_mode - send keyboard with Inline Query";
 
@@ -180,26 +178,10 @@ public class UpdateHandler : IUpdateHandler
                 cancellationToken: cancellationToken);
         }
 
-        static async Task<Message> StartInlineQuery(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
-        {
-            InlineKeyboardMarkup inlineKeyboard = new(
-                InlineKeyboardButton.WithSwitchInlineQueryCurrentChat("Inline Mode"));
-
-            return await botClient.SendTextMessageAsync(
-                chatId: message.Chat.Id,
-                text: "Press the button to start Inline Query",
-                replyMarkup: inlineKeyboard,
-                cancellationToken: cancellationToken);
-        }
-
-#pragma warning disable RCS1163 // Unused parameter.
-#pragma warning disable IDE0060 // Remove unused parameter
         static Task<Message> FailingHandler(ITelegramBotClient botClient, Message message, CancellationToken cancellationToken)
         {
             throw new IndexOutOfRangeException();
         }
-#pragma warning restore IDE0060 // Remove unused parameter
-#pragma warning restore RCS1163 // Unused parameter.
     }
 
     // Process Inline Keyboard callback data
@@ -252,11 +234,7 @@ public class UpdateHandler : IUpdateHandler
 
     #endregion
 
-#pragma warning disable IDE0060 // Remove unused parameter
-#pragma warning disable RCS1163 // Unused parameter.
     private Task UnknownUpdateHandlerAsync(Update update, CancellationToken cancellationToken)
-#pragma warning restore RCS1163 // Unused parameter.
-#pragma warning restore IDE0060 // Remove unused parameter
     {
         _logger.LogInformation("Unknown update type: {UpdateType}", update.Type);
         return Task.CompletedTask;
