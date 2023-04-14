@@ -1,0 +1,16 @@
+using Microsoft.Extensions.Logging;
+using TgBunkergameBot.Abstract;
+
+namespace Telegram.Bot.Services;
+
+// Compose Receiver and UpdateHandler implementation
+public class ReceiverService : ReceiverServiceBase<UpdateHandler>
+{
+    public ReceiverService(
+        ITelegramBotClient botClient,
+        UpdateHandler updateHandler,
+        ILogger<ReceiverServiceBase<UpdateHandler>> logger)
+        : base(botClient, updateHandler, logger)
+    {
+    }
+}

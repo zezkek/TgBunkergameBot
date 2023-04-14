@@ -1,30 +1,27 @@
-﻿using Telegram.Bot;
-using Telegram.Bot.Exceptions;
-using Telegram.Bot.Polling;
-using Telegram.Bot.Types;
-using Telegram.Bot.Types.Enums;
-using CancellationTokenSource cts = new CancellationTokenSource();
+﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Telegram.Bot;
+using Telegram.Bot.Services;
+using TgBunkergameBot;
 
-string token = "";
-TelegramBotClient client = new TelegramBotClient(token);
+IHost host = Host.CreateDefaultBuilder(args)
+    .ConfigureServices((context, services) =>
+    {
+        services.Configure<BotConfiguration>(
+            context.Configuration.GetSection(BotConfiguration.Configuration));
 
-ReceiverOptions receiver = new ReceiverOptions
-{
-    AllowedUpdates = Array.Empty<UpdateType>()
-};
+        services.AddHttpClient("telegram_bot_client")
+                .AddTypedClient<ITelegramBotClient>((httpClient, sp) =>
+                {
+                    BotConfiguration? botConfig = sp.GetConfiguration<BotConfiguration>();
+                    TelegramBotClientOptions options = new(botConfig.BotToken);
+                    return new TelegramBotClient(options, httpClient);
+                });
 
-client.StartReceiving(
-    updateHandler: HandleUpdateAsync,
-    pollingErrorHandler: HandlePollingErrorsAsync,
-    receiverOptions: receiver,
-    cancellationToken: cts.Token
-    );
-async Task HandlePollingErrorsAsync(ITelegramBotClient arg1, Exception arg2, CancellationToken arg3)
-{
-    throw new NotImplementedException();
-}
+        services.AddScoped<UpdateHandler>();
+        services.AddScoped<ReceiverService>();
+        services.AddHostedService<PollingService>();
+    })
+    .Build();
 
-async Task HandleUpdateAsync(ITelegramBotClient arg1, Update arg2, CancellationToken arg3)
-{
-    throw new NotImplementedException();
-}
+await host.RunAsync();
